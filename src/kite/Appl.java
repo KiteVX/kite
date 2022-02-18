@@ -16,11 +16,13 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.mail.Flags.Flag;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
 import javax.swing.JTextField;
 
 /**
  *
- * @author Aadhitya
+ * @author Aadhitya, Balasubramanian
  */
 public class Appl extends javax.swing.JFrame {
 
@@ -126,7 +128,7 @@ public class Appl extends javax.swing.JFrame {
         jPanel1Layout.setHorizontalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel1Layout.createSequentialGroup()
                         .addContainerGap()
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -144,12 +146,12 @@ public class Appl extends javax.swing.JFrame {
                             .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 296, Short.MAX_VALUE)))
                     .addGroup(jPanel1Layout.createSequentialGroup()
                         .addGap(112, 112, 112)
-                        .addComponent(jButton1)
-                        .addGap(80, 80, 80)
-                        .addComponent(jButton2))
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(jLabel18, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                            .addComponent(jLabel18, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addComponent(jButton1)
+                                .addGap(80, 80, 80)
+                                .addComponent(jButton2)))))
                 .addContainerGap(118, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
@@ -400,13 +402,54 @@ public class Appl extends javax.swing.JFrame {
         return Base64.getEncoder().encodeToString(encryptedBytes);
     }
     
-    public static String decrypt(String encryptedContent, String keyText) throws Exception{
-        byte[] messageInBytes = Base64.getDecoder().decode(encryptedContent);
+    public static String decrypt(String encryptedContent, String keyText) throws Exception {
+        byte[] messageInBytes = Base64.getMimeDecoder().decode(encryptedContent);
         Cipher decrypt = Cipher.getInstance("AES/CBC/PKCS5Padding");
         SecretKeySpec key = new SecretKeySpec(keyText.getBytes(StandardCharsets.UTF_8), "AES");
         decrypt.init(Cipher.DECRYPT_MODE, key,new IvParameterSpec(IV.getBytes(StandardCharsets.UTF_8)));
         byte[] decryptedBytes = decrypt.doFinal(messageInBytes);
         return new String(decryptedBytes);
+    }
+    
+    //SMTP mail code
+    private static Session createSession(Properties prop, String from, String password) {
+        Session sess = Session.getInstance(prop, new javax.mail.Authenticator() {
+            @Override
+            protected javax.mail.PasswordAuthentication getPasswordAuthentication() {
+                return new javax.mail.PasswordAuthentication(from, password);
+            }
+        });
+        return sess;
+    }
+
+    private static Message createMessage(Session sess,Properties prop,String from,String to,String sub,String Msgg) throws Exception{
+        Message msg = new MimeMessage(sess);
+        msg.setFrom(new InternetAddress(from));
+        msg.setRecipient(Message.RecipientType.TO, new InternetAddress(to));
+        msg.setSubject(sub);
+        msg.setText(Msgg);
+        return msg;
+
+    }
+
+    private boolean sendMail(String to, String sub, String msgg,String frm,String passk) {
+        try{
+            Properties prop = new Properties();
+
+            prop.put("mail.smtp.auth", "true");
+            prop.put("mail.smtp.starttls.enable", "true");
+            prop.put("mail.smtp.trust", serverSMTP);
+            prop.put("mail.smtp.host", serverSMTP);
+            prop.put("mail.smtp.port", portSMTP);
+
+            Session sess = createSession(prop, frm, passk);
+            String encriptedText = encrypt( msgg.getBytes(), key);
+            Message msg = createMessage(sess, prop, frm, to,sub,encriptedText);
+            Transport.send(msg);
+        } catch (Exception e) {
+            return false;
+        }
+        return true;
     }
     
     public static String mailFetch(String server, int port, String mail, String pass) throws Exception {
@@ -431,11 +474,9 @@ public class Appl extends javax.swing.JFrame {
         Message[] messages = folder.search(new FlagTerm(new Flags(Flags.Flag.SEEN), true));
         
         Message msg = messages[messages.length - 1]; // Fetching latest mail
+        System.out.println(msg.getContent().toString());
         
-        Multipart mp = (Multipart) msg.getContent();
-        BodyPart bp =  mp.getBodyPart(0);
-        String encrypt = bp.getContent().toString();
-        
+        String encrypt = msg.getContent().toString();
         
         return encrypt;
     }
@@ -459,26 +500,20 @@ public class Appl extends javax.swing.JFrame {
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         // TODO add your handling code here:
         
-        // Code for email import part
+         // Code for email import part
         String sender = jTextField1.getText();
         String passKey = jPasswordField1.getText();
         String receiver = jTextField2.getText();
-        
+
         String subject = jTextField3.getText();
         String body = jTextArea1.getText();
-        String Su8j3c7 = null;
-        String b0dy = null;
-        // Encryption mode
-        try {
-            Su8j3c7 = encrypt(subject.getBytes(), key);
-            b0dy = encrypt(body.getBytes(), key);
+
+        if (sendMail(receiver,subject,body,sender,passKey)) {
+            jLabel18.setText("The email is successfully sent ");
         }
-        catch (Exception e)
-        {
-            e.printStackTrace();
+        else {
+            jLabel18.setText("Error occured while sending !!!");
         }
-        jTextField3.setText(Su8j3c7);
-        jTextArea1.setText(b0dy);
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
@@ -488,22 +523,25 @@ public class Appl extends javax.swing.JFrame {
         String mail = jTextField4.getText();
         String pass = jPasswordField2.getText();
         String body = null;
+        String b0dy = null;
         
         try {
             body = mailFetch(serverIMAP, portIMAP, mail, pass);
+            //body = "wOgB3rxBHZXgftxQxdfD1A==";
+            System.out.println(body);
         } catch (Exception ex) {
             Logger.getLogger(Appl.class.getName()).log(Level.SEVERE, null, ex);
         }
         jTextField5.setText("Mail fetched. Decrypting...");
         // Decryption part
         try {
-            body = decrypt(body, key);
+            b0dy = decrypt(body, key);
         }
         catch (Exception e)
         {
             e.printStackTrace();
         }
-        jTextArea2.setText(body);
+        jTextArea2.setText(b0dy);
     }//GEN-LAST:event_jButton3ActionPerformed
 
     private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton4ActionPerformed
