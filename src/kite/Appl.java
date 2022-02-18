@@ -4,6 +4,20 @@
  */
 package kite;
 
+import com.sun.mail.imap.IMAPFolder;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import javax.mail.*;
+import javax.mail.search.FlagTerm;
+import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.mail.Flags.Flag;
+import javax.swing.JTextField;
+
 /**
  *
  * @author Aadhitya
@@ -11,11 +25,14 @@ package kite;
 public class Appl extends javax.swing.JFrame {
 
     /**
-     * Creates new form Appl
+     * Creates new form for kite
      */
     public Appl() {
         initComponents();
     }
+    
+    int portSMTP, portIMAP;
+    String serverSMTP, serverIMAP;
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -91,6 +108,11 @@ public class Appl extends javax.swing.JFrame {
         jScrollPane1.setViewportView(jTextArea1);
 
         jButton1.setText("Encrypt & Send");
+        jButton1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton1ActionPerformed(evt);
+            }
+        });
 
         jButton2.setText("Clear fields");
         jButton2.addActionListener(new java.awt.event.ActionListener() {
@@ -169,8 +191,13 @@ public class Appl extends javax.swing.JFrame {
         jLabel8.setText("Your password");
 
         jButton3.setText("Fetch recent mail");
+        jButton3.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton3ActionPerformed(evt);
+            }
+        });
 
-        jLabel9.setText("Heading");
+        jLabel9.setText("Message from app");
 
         jLabel10.setText("Body");
 
@@ -203,9 +230,9 @@ public class Appl extends javax.swing.JFrame {
                     .addGroup(jPanel2Layout.createSequentialGroup()
                         .addContainerGap()
                         .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jLabel9)
-                            .addComponent(jLabel10))
-                        .addGap(177, 177, 177)
+                            .addComponent(jLabel10)
+                            .addComponent(jLabel9, javax.swing.GroupLayout.PREFERRED_SIZE, 103, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(121, 121, 121)
                         .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jTextField5)
                             .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 236, Short.MAX_VALUE)))
@@ -216,7 +243,7 @@ public class Appl extends javax.swing.JFrame {
                             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel2Layout.createSequentialGroup()
                                 .addComponent(jButton5)
                                 .addGap(30, 30, 30)))))
-                .addContainerGap(154, Short.MAX_VALUE))
+                .addContainerGap(152, Short.MAX_VALUE))
         );
         jPanel2Layout.setVerticalGroup(
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -264,6 +291,11 @@ public class Appl extends javax.swing.JFrame {
         jLabel16.setText("Port number");
 
         jButton4.setText("Save config");
+        jButton4.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton4ActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout jPanel3Layout = new javax.swing.GroupLayout(jPanel3);
         jPanel3.setLayout(jPanel3Layout);
@@ -355,6 +387,58 @@ public class Appl extends javax.swing.JFrame {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
+    
+    // Functions for encryption, decryption and values of keys
+    static String IV = "AAAAAAAAAAAAAAAA";
+    static String key = "0123456789abcdef1234567898765432"; // (256 bits - 32 chars)
+    
+    public static String encrypt(byte[] originalContent, String keyText) throws Exception {
+        Cipher encrypt = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        SecretKeySpec key = new SecretKeySpec(keyText.getBytes(StandardCharsets.UTF_8), "AES");
+        encrypt.init(Cipher.ENCRYPT_MODE, key,new IvParameterSpec(IV.getBytes(StandardCharsets.UTF_8)));
+        byte[] encryptedBytes = encrypt.doFinal(originalContent);
+        return Base64.getEncoder().encodeToString(encryptedBytes);
+    }
+    
+    public static String decrypt(String encryptedContent, String keyText) throws Exception{
+        byte[] messageInBytes = Base64.getDecoder().decode(encryptedContent);
+        Cipher decrypt = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        SecretKeySpec key = new SecretKeySpec(keyText.getBytes(StandardCharsets.UTF_8), "AES");
+        decrypt.init(Cipher.DECRYPT_MODE, key,new IvParameterSpec(IV.getBytes(StandardCharsets.UTF_8)));
+        byte[] decryptedBytes = decrypt.doFinal(messageInBytes);
+        return new String(decryptedBytes);
+    }
+    
+    public static String mailFetch(String server, int port, String mail, String pass) throws Exception {
+        String mailServer = server;
+        String mailID = mail;
+        String passKey = pass;
+        
+        IMAPFolder folder = null;
+        Store store = null;
+        String subject = null;
+        Flag flag = null;
+        
+        Properties props = System.getProperties();
+        props.setProperty("mail.store.protocol", "imaps");
+        Session session = Session.getDefaultInstance(new Properties( ));
+        store = session.getStore("imaps");
+        store.connect(mailServer, port, mailID, passKey);
+        folder = (IMAPFolder) store.getFolder("inbox");
+        folder.open( Folder.READ_ONLY );
+
+        // Fetch unseen messages from inbox folder
+        Message[] messages = folder.search(new FlagTerm(new Flags(Flags.Flag.SEEN), true));
+        
+        Message msg = messages[messages.length - 1]; // Fetching latest mail
+        
+        Multipart mp = (Multipart) msg.getContent();
+        BodyPart bp =  mp.getBodyPart(0);
+        String encrypt = bp.getContent().toString();
+        
+        
+        return encrypt;
+    }
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
         // TODO add your handling code here:
         jTextField1.setText("");
@@ -371,6 +455,67 @@ public class Appl extends javax.swing.JFrame {
         jTextField5.setText("");
         jTextArea2.setText("");
     }//GEN-LAST:event_jButton5ActionPerformed
+
+    private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
+        // TODO add your handling code here:
+        
+        // Code for email import part
+        String sender = jTextField1.getText();
+        String passKey = jPasswordField1.getText();
+        String receiver = jTextField2.getText();
+        
+        String subject = jTextField3.getText();
+        String body = jTextArea1.getText();
+        String Su8j3c7 = null;
+        String b0dy = null;
+        // Encryption mode
+        try {
+            Su8j3c7 = encrypt(subject.getBytes(), key);
+            b0dy = encrypt(body.getBytes(), key);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+        jTextField3.setText(Su8j3c7);
+        jTextArea1.setText(b0dy);
+    }//GEN-LAST:event_jButton1ActionPerformed
+
+    private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
+        // TODO add your handling code here:
+        
+        // Code for receiving and decrypting mail
+        String mail = jTextField4.getText();
+        String pass = jPasswordField2.getText();
+        String Su8j3c7 = null;
+        String b0dy = null;
+        String subject = null;
+        String body = null;
+        // Decryption part
+        //try {
+        //    subject = decrypt(mail, key);
+        //    body = decrypt(pass, key);
+        //}
+        //catch (Exception e)
+        //{
+        //    e.printStackTrace();
+        //}
+        jTextField5.setText("Mail fetched. Decrypting...");
+        try {
+            body = mailFetch(serverIMAP, portIMAP, mail, pass);
+        } catch (Exception ex) {
+            Logger.getLogger(Appl.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        jTextArea2.setText(body);
+    }//GEN-LAST:event_jButton3ActionPerformed
+
+    private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton4ActionPerformed
+        // TODO add your handling code here:
+        portSMTP = Integer.parseInt(jTextField7.getText());
+        portIMAP = Integer.parseInt(jTextField9.getText());
+        serverSMTP = jTextField6.getText();
+        serverIMAP = jTextField8.getText();
+    }//GEN-LAST:event_jButton4ActionPerformed
 
     /**
      * @param args the command line arguments
