@@ -487,24 +487,21 @@ public class Appl extends javax.swing.JFrame {
         // Code for receiving and decrypting mail
         String mail = jTextField4.getText();
         String pass = jPasswordField2.getText();
-        String Su8j3c7 = null;
-        String b0dy = null;
-        String subject = null;
         String body = null;
-        // Decryption part
-        //try {
-        //    subject = decrypt(mail, key);
-        //    body = decrypt(pass, key);
-        //}
-        //catch (Exception e)
-        //{
-        //    e.printStackTrace();
-        //}
-        jTextField5.setText("Mail fetched. Decrypting...");
+        
         try {
             body = mailFetch(serverIMAP, portIMAP, mail, pass);
         } catch (Exception ex) {
             Logger.getLogger(Appl.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        jTextField5.setText("Mail fetched. Decrypting...");
+        // Decryption part
+        try {
+            body = decrypt(body, key);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
         }
         jTextArea2.setText(body);
     }//GEN-LAST:event_jButton3ActionPerformed
